@@ -7,28 +7,28 @@ import folium
 from streamlit_folium import st_folium
 import requests
 
-# --- 페이지 설정 ---
+# --- 페이지 설정 (반드시 맨 처음) ---
+st.set_page_config(page_title="서울시 범죄 위험도 분석", layout="wide")
+
 # --- 다크 테마 커스텀 CSS ---
-# --- 파란색 테마 커스텀 CSS ---
 st.markdown("""
 <style>
     .stApp {
-        background: linear-gradient(180deg, #0a1628 0%, #1a2744 50%, #0d2137 100%);
+        background-color: #0e1117;
         color: #e0e8f0;
     }
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0b1a33 0%, #132d50 100%);
+        background-color: #161b22;
         border-right: 1px solid #1e3a5f;
     }
     [data-testid="stMetric"] {
-        background: rgba(30, 58, 95, 0.5);
+        background-color: #161b22;
         border: 1px solid #2a5a8f;
         border-radius: 12px;
         padding: 15px;
-        backdrop-filter: blur(10px);
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: rgba(20, 40, 70, 0.6);
+        background-color: #161b22;
         border-radius: 8px 8px 0 0;
         color: #8bb8e0;
     }
@@ -38,7 +38,6 @@ st.markdown("""
     }
     h1 {
         color: #5ba3e6;
-        text-shadow: 0 0 20px rgba(91, 163, 230, 0.3);
     }
     h2, h3 {
         color: #7bbcf0;
@@ -47,21 +46,14 @@ st.markdown("""
         border: 1px solid #1e3a5f;
         border-radius: 10px;
     }
-    .stSelectbox label, .stSlider label, .stMultiSelect label {
-        color: #a0c4e8;
-    }
-    [data-testid="stSidebar"] .stRadio label {
-        color: #c0d8f0;
-    }
 </style>
 """, unsafe_allow_html=True)
-st.set_page_config(page_title="서울시 범죄 위험도 분석", layout="wide")
+
 st.title("서울시 범죄 위험도 분석 대시보드")
 
 # --- 데이터 불러오기 ---
 @st.cache_data
 def load_data():
-    # 범죄율 검거율
     try:
         crime = pd.read_csv('자치구별 범죄율 검거율 5개년.csv', encoding='utf-8', header=1)
     except:
@@ -76,7 +68,6 @@ def load_data():
     for c in crime.columns[1:]:
         crime[c] = pd.to_numeric(crime[c], errors='coerce')
 
-    # 전국 발생 검거 수
     try:
         occur = pd.read_csv('전국 발생 검거 수.csv', encoding='utf-8', header=1)
     except:
@@ -92,14 +83,12 @@ def load_data():
     for c in occur.columns[1:]:
         occur[c] = pd.to_numeric(occur[c].astype(str).str.replace(',', ''), errors='coerce')
 
-    # CCTV
     try:
         cctv = pd.read_csv('cctv_clean.csv', encoding='utf-8')
     except:
         cctv = pd.read_csv('cctv_clean.csv', encoding='cp949')
     cctv['총 계'] = pd.to_numeric(cctv['총 계'].astype(str).str.replace(',', ''), errors='coerce')
 
-    # 인구
     try:
         pop = pd.read_csv('인구 수.csv', encoding='utf-8', header=1)
     except:
@@ -114,7 +103,6 @@ def load_data():
 
 crime, occur, cctv, pop = load_data()
 
-# --- GeoJSON 불러오기 ---
 @st.cache_data
 def load_geojson():
     url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
@@ -122,9 +110,6 @@ def load_geojson():
 
 seoul_geo = load_geojson()
 
-# ==========================================
-# 복합 위험도 점수 계산 함수
-# ==========================================
 @st.cache_data
 def calc_risk_score(crime_df, occur_df, cctv_df, pop_df, year=2023):
     risk = pd.DataFrame()
@@ -199,15 +184,11 @@ def calc_risk_score(crime_df, occur_df, cctv_df, pop_df, year=2023):
     risk['위험등급'] = risk['위험도_점수_100'].apply(grade)
     return risk
 
-# --- 사이드바 ---
 menu = st.sidebar.radio(
     "메뉴 선택",
-    ["범죄 현황 분석", "CCTV 현황", "위험도 지도", "🆕 복합 위험도 분석", "🆕 맞춤형 조회"]
+    ["범죄 현황 분석", "CCTV 현황", "위험도 지도", "복합 위험도 분석", "맞춤형 조회"]
 )
 
-# ==========================================
-# 페이지 1: 범죄 현황 분석
-# ==========================================
 if menu == "범죄 현황 분석":
     st.header("자치구별 범죄 현황 분석")
     year = st.sidebar.selectbox("연도 선택", [2023, 2022, 2021, 2020, 2019])
@@ -253,9 +234,6 @@ if menu == "범죄 현황 분석":
         fig4.update_layout(height=600)
         st.plotly_chart(fig4, use_container_width=True)
 
-# ==========================================
-# 페이지 2: CCTV 현황
-# ==========================================
 elif menu == "CCTV 현황":
     st.header("자치구별 CCTV 설치 현황")
     st.dataframe(cctv, use_container_width=True)
@@ -269,9 +247,6 @@ elif menu == "CCTV 현황":
         fig5.update_layout(xaxis_tickangle=-45, height=500)
         st.plotly_chart(fig5, use_container_width=True)
 
-# ==========================================
-# 페이지 3: 위험도 지도 (기존)
-# ==========================================
 elif menu == '위험도 지도':
     st.header('서울시 범죄 위험도 지도')
     year_map = st.sidebar.selectbox('연도 선택', [2023, 2022, 2021, 2020, 2019], key='map_year')
@@ -297,10 +272,10 @@ elif menu == '위험도 지도':
     elif indicator == '인구 대비 CCTV':
         cctv_pop = cctv[['자치구', '총 계']].copy().rename(columns={'자치구': '자치구별'})
         cctv_pop['자치구별'] = cctv_pop['자치구별'].str.strip()
-        cctv_pop['총 계'] = pd.to_numeric(cctv_pop['총 계'].astype(str).str.replace(',', ''), errors='coerce')
+        cctv_pop['총 계'] = cctv_pop['총 계'].astype(str).str.replace(',', '').astype(float)
         pop_c = pop.copy()
         pop_c['자치구별'] = pop_c['자치구별'].str.strip()
-        pop_c['2023_인구'] = pd.to_numeric(pop_c['2023_인구'].astype(str).str.replace(',', ''), errors='coerce')
+        pop_c['2023_인구'] = pop_c['2023_인구'].astype(str).str.replace(',', '').astype(float)
         merged = pd.merge(cctv_pop, pop_c[['자치구별', '2023_인구']], on='자치구별', how='inner')
         merged['인구천명당_CCTV'] = (merged['총 계'] / merged['2023_인구'] * 1000).round(2)
         data_df = merged
@@ -339,10 +314,7 @@ elif menu == '위험도 지도':
             st.subheader(f'{indicator} 하위 5개 구')
             st.dataframe(data_df.nsmallest(5, col_val)[['자치구별', col_val]], use_container_width=True, hide_index=True)
 
-# ==========================================
-# 페이지 4: 복합 위험도 분석
-# ==========================================
-elif menu == '🆕 복합 위험도 분석':
+elif menu == '복합 위험도 분석':
     st.header('복합 환경 지표 기반 위험도 지도')
     st.caption('범죄율, 검거율, 인구 대비 범죄, CCTV 밀도를 종합한 복합 위험도 점수입니다.')
 
@@ -397,10 +369,10 @@ elif menu == '🆕 복합 위험도 분석':
                 <b style="font-size:15px;">{gu_name}</b><br><br>
                 위험도 점수: <b>{r['위험도_점수_100']}</b>/100<br>
                 {r['위험등급']}<br><br>
-                ▸ 범죄율: {r['범죄율']}%<br>
-                ▸ 검거율: {r['검거율']}%<br>
-                ▸ 인구만명당 범죄: {r['인구만명당_범죄']}건<br>
-                ▸ 인구천명당 CCTV: {r['인구천명당_CCTV']}대
+                범죄율: {r['범죄율']}%<br>
+                검거율: {r['검거율']}%<br>
+                인구만명당 범죄: {r['인구만명당_범죄']}건<br>
+                인구천명당 CCTV: {r['인구천명당_CCTV']}대
             </div>
             """
             folium.GeoJson(
@@ -457,10 +429,7 @@ elif menu == '🆕 복합 위험도 분석':
     fig_scatter.update_layout(height=500)
     st.plotly_chart(fig_scatter, use_container_width=True)
 
-# ==========================================
-# 페이지 5: 맞춤형 조회
-# ==========================================
-elif menu == '🆕 맞춤형 조회':
+elif menu == '맞춤형 조회':
     st.header('맞춤형 자치구 조회')
     st.caption('원하는 조건으로 자치구를 검색하고 비교해보세요.')
 
