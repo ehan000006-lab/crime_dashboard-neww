@@ -8,6 +8,47 @@ from streamlit_folium import st_folium
 import requests
 
 # --- 페이지 설정 ---
+# --- 다크 테마 커스텀 CSS ---
+st.markdown("""
+<style>
+    /* 메인 배경 */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    /* 사이드바 */
+    [data-testid="stSidebar"] {
+        background-color: #161b22;
+        border-right: 1px solid #30363d;
+    }
+    /* 메트릭 카드 */
+    [data-testid="stMetric"] {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 10px;
+        padding: 15px;
+    }
+    /* 탭 */
+    .stTabs [data-baseweb="tab"] {
+        background-color: #161b22;
+        border-radius: 8px 8px 0 0;
+        color: #c9d1d9;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1f6feb;
+        color: white;
+    }
+    /* 헤더 */
+    h1, h2, h3 {
+        color: #58a6ff;
+    }
+    /* 데이터프레임 */
+    [data-testid="stDataFrame"] {
+        border: 1px solid #30363d;
+        border-radius: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
 st.set_page_config(page_title="서울시 범죄 위험도 분석", layout="wide")
 st.title("서울시 범죄 위험도 분석 대시보드")
 
