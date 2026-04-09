@@ -9,43 +9,49 @@ import requests
 
 # --- 페이지 설정 ---
 # --- 다크 테마 커스텀 CSS ---
+# --- 파란색 테마 커스텀 CSS ---
 st.markdown("""
 <style>
-    /* 메인 배경 */
     .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
+        background: linear-gradient(180deg, #0a1628 0%, #1a2744 50%, #0d2137 100%);
+        color: #e0e8f0;
     }
-    /* 사이드바 */
     [data-testid="stSidebar"] {
-        background-color: #161b22;
-        border-right: 1px solid #30363d;
+        background: linear-gradient(180deg, #0b1a33 0%, #132d50 100%);
+        border-right: 1px solid #1e3a5f;
     }
-    /* 메트릭 카드 */
     [data-testid="stMetric"] {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 10px;
+        background: rgba(30, 58, 95, 0.5);
+        border: 1px solid #2a5a8f;
+        border-radius: 12px;
         padding: 15px;
+        backdrop-filter: blur(10px);
     }
-    /* 탭 */
     .stTabs [data-baseweb="tab"] {
-        background-color: #161b22;
+        background-color: rgba(20, 40, 70, 0.6);
         border-radius: 8px 8px 0 0;
-        color: #c9d1d9;
+        color: #8bb8e0;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #1f6feb;
+        background-color: #1a6dc2;
         color: white;
     }
-    /* 헤더 */
-    h1, h2, h3 {
-        color: #58a6ff;
+    h1 {
+        color: #5ba3e6;
+        text-shadow: 0 0 20px rgba(91, 163, 230, 0.3);
     }
-    /* 데이터프레임 */
+    h2, h3 {
+        color: #7bbcf0;
+    }
     [data-testid="stDataFrame"] {
-        border: 1px solid #30363d;
-        border-radius: 8px;
+        border: 1px solid #1e3a5f;
+        border-radius: 10px;
+    }
+    .stSelectbox label, .stSlider label, .stMultiSelect label {
+        color: #a0c4e8;
+    }
+    [data-testid="stSidebar"] .stRadio label {
+        color: #c0d8f0;
     }
 </style>
 """, unsafe_allow_html=True)
