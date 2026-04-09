@@ -9,7 +9,7 @@ import requests
 
 # --- 페이지 설정 ---
 st.set_page_config(page_title="서울시 범죄 위험도 분석", layout="wide")
-st.title("🔍 서울시 범죄 위험도 분석 대시보드")
+st.title("서울시 범죄 위험도 분석 대시보드")
 
 # --- 데이터 불러오기 ---
 @st.cache_data
@@ -141,20 +141,20 @@ def calc_risk_score(crime_df, occur_df, cctv_df, pop_df, year=2023):
 
     def grade(score):
         if score >= 70:
-            return '🔴 위험'
+            return '위험'
         elif score >= 50:
-            return '🟠 주의'
+            return '주의'
         elif score >= 30:
-            return '🟡 보통'
+            return '보통'
         else:
-            return '🟢 안전'
+            return '안전'
 
     risk['위험등급'] = risk['위험도_점수_100'].apply(grade)
     return risk
 
 # --- 사이드바 ---
 menu = st.sidebar.radio(
-    "📌 메뉴 선택",
+    "메뉴 선택",
     ["범죄 현황 분석", "CCTV 현황", "위험도 지도", "🆕 복합 위험도 분석", "🆕 맞춤형 조회"]
 )
 
@@ -162,7 +162,7 @@ menu = st.sidebar.radio(
 # 페이지 1: 범죄 현황 분석
 # ==========================================
 if menu == "범죄 현황 분석":
-    st.header("📊 자치구별 범죄 현황 분석")
+    st.header("자치구별 범죄 현황 분석")
     year = st.sidebar.selectbox("연도 선택", [2023, 2022, 2021, 2020, 2019])
 
     st.subheader(f"{year}년 자치구별 범죄 발생 건수")
@@ -210,7 +210,7 @@ if menu == "범죄 현황 분석":
 # 페이지 2: CCTV 현황
 # ==========================================
 elif menu == "CCTV 현황":
-    st.header("📹 자치구별 CCTV 설치 현황")
+    st.header("자치구별 CCTV 설치 현황")
     st.dataframe(cctv, use_container_width=True)
 
     st.subheader("2023년 자치구별 인구 현황")
@@ -226,7 +226,7 @@ elif menu == "CCTV 현황":
 # 페이지 3: 위험도 지도 (기존)
 # ==========================================
 elif menu == '위험도 지도':
-    st.header('🗺️ 서울시 범죄 위험도 지도')
+    st.header('서울시 범죄 위험도 지도')
     year_map = st.sidebar.selectbox('연도 선택', [2023, 2022, 2021, 2020, 2019], key='map_year')
     indicator = st.sidebar.selectbox('지표 선택', ['범죄율', '검거율', '범죄 발생 건수', '인구 대비 CCTV'])
 
@@ -286,24 +286,24 @@ elif menu == '위험도 지도':
     if col_val in data_df.columns:
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader(f'⚠️ {indicator} 상위 5개 구')
+            st.subheader(f'{indicator} 상위 5개 구')
             st.dataframe(data_df.nlargest(5, col_val)[['자치구별', col_val]], use_container_width=True, hide_index=True)
         with col2:
-            st.subheader(f'✅ {indicator} 하위 5개 구')
+            st.subheader(f'{indicator} 하위 5개 구')
             st.dataframe(data_df.nsmallest(5, col_val)[['자치구별', col_val]], use_container_width=True, hide_index=True)
 
 # ==========================================
 # 페이지 4: 복합 위험도 분석
 # ==========================================
 elif menu == '🆕 복합 위험도 분석':
-    st.header('🗺️ 복합 환경 지표 기반 위험도 지도')
+    st.header('복합 환경 지표 기반 위험도 지도')
     st.caption('범죄율, 검거율, 인구 대비 범죄, CCTV 밀도를 종합한 복합 위험도 점수입니다.')
 
     year_risk = st.sidebar.selectbox('연도 선택', [2023, 2022, 2021, 2020, 2019], key='risk_year')
     risk_df = calc_risk_score(crime, occur, cctv, pop, year=year_risk)
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("⚖️ 가중치 조절")
+    st.sidebar.subheader("가중치 조절")
     w_crime = st.sidebar.slider("범죄율 가중치", 0, 100, 30, key='w1')
     w_arrest = st.sidebar.slider("검거율(역) 가중치", 0, 100, 20, key='w2')
     w_occur = st.sidebar.slider("인구당 범죄 가중치", 0, 100, 30, key='w3')
@@ -321,13 +321,13 @@ elif menu == '🆕 복합 위험도 분석':
 
         def grade(score):
             if score >= 70:
-                return '🔴 위험'
+                return '위험'
             elif score >= 50:
-                return '🟠 주의'
+                return '주의'
             elif score >= 30:
-                return '🟡 보통'
+                return '보통'
             else:
-                return '🟢 안전'
+                return '안전'
         risk_df['위험등급'] = risk_df['위험도_점수_100'].apply(grade)
 
     m2 = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles='CartoDB positron')
@@ -348,7 +348,7 @@ elif menu == '🆕 복합 위험도 분석':
             popup_html = f"""
             <div style="font-family:sans-serif; font-size:13px; min-width:180px;">
                 <b style="font-size:15px;">{gu_name}</b><br><br>
-                📊 위험도 점수: <b>{r['위험도_점수_100']}</b>/100<br>
+                위험도 점수: <b>{r['위험도_점수_100']}</b>/100<br>
                 {r['위험등급']}<br><br>
                 ▸ 범죄율: {r['범죄율']}%<br>
                 ▸ 검거율: {r['검거율']}%<br>
@@ -364,14 +364,14 @@ elif menu == '🆕 복합 위험도 분석':
 
     st_folium(m2, width=800, height=550)
 
-    st.subheader(f'📋 {year_risk}년 자치구별 복합 위험도 랭킹')
+    st.subheader(f'{year_risk}년 자치구별 복합 위험도 랭킹')
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("### ⚠️ 위험도 상위 5개 구")
+        st.markdown("### 위험도 상위 5개 구")
         top5 = risk_df.nlargest(5, '위험도_점수_100')[['자치구별', '위험도_점수_100', '위험등급', '범죄율', '검거율', '인구만명당_범죄', '인구천명당_CCTV']]
         st.dataframe(top5, use_container_width=True, hide_index=True)
     with col2:
-        st.markdown("### ✅ 위험도 하위 5개 구 (안전)")
+        st.markdown("### 위험도 하위 5개 구 (안전)")
         bot5 = risk_df.nsmallest(5, '위험도_점수_100')[['자치구별', '위험도_점수_100', '위험등급', '범죄율', '검거율', '인구만명당_범죄', '인구천명당_CCTV']]
         st.dataframe(bot5, use_container_width=True, hide_index=True)
 
@@ -384,7 +384,7 @@ elif menu == '🆕 복합 위험도 분석':
     fig_risk.update_layout(height=650)
     st.plotly_chart(fig_risk, use_container_width=True)
 
-    st.subheader('🕸️ 상위 위험 지역 세부 지표 비교 (레이더 차트)')
+    st.subheader('상위 위험 지역 세부 지표 비교 (레이더 차트)')
     top3 = risk_df.nlargest(3, '위험도_점수_100')
     categories = ['범죄율', '검거율(역)', '인구당 범죄', 'CCTV 부족']
     fig_radar = go.Figure()
@@ -401,7 +401,7 @@ elif menu == '🆕 복합 위험도 분석':
                             showlegend=True, height=500)
     st.plotly_chart(fig_radar, use_container_width=True)
 
-    st.subheader('📈 범죄율 vs 인구당 CCTV 산점도')
+    st.subheader('범죄율 vs 인구당 CCTV 산점도')
     fig_scatter = px.scatter(risk_df, x='인구천명당_CCTV', y='범죄율',
                              size='위험도_점수_100', color='위험도_점수_100',
                              color_continuous_scale='RdYlGn_r', hover_name='자치구별',
@@ -414,13 +414,13 @@ elif menu == '🆕 복합 위험도 분석':
 # 페이지 5: 맞춤형 조회
 # ==========================================
 elif menu == '🆕 맞춤형 조회':
-    st.header('🔎 맞춤형 자치구 조회')
+    st.header('맞춤형 자치구 조회')
     st.caption('원하는 조건으로 자치구를 검색하고 비교해보세요.')
 
     year_q = st.sidebar.selectbox('기준 연도', [2023, 2022, 2021, 2020, 2019], key='query_year')
     risk_df = calc_risk_score(crime, occur, cctv, pop, year=year_q)
 
-    tab1, tab2, tab3 = st.tabs(["🏘️ 자치구 선택 조회", "🎯 조건 필터링", "📊 자치구 비교"])
+    tab1, tab2, tab3 = st.tabs(["자치구 선택 조회", "조건 필터링", "자치구 비교"])
 
     with tab1:
         selected_gu = st.selectbox('자치구를 선택하세요', sorted(risk_df['자치구별'].tolist()))
@@ -437,7 +437,7 @@ elif menu == '🆕 맞춤형 조회':
         c6.metric("인구 천명당 CCTV", f"{row['인구천명당_CCTV']}대")
 
         st.markdown("---")
-        st.subheader(f'📊 {selected_gu} 세부 지표 분석')
+        st.subheader(f'{selected_gu} 세부 지표 분석')
 
         categories = ['범죄율', '검거율(역)', '인구당 범죄', 'CCTV 부족']
         values = [row['범죄율_norm'], row['검거율_norm'], row['인구만명당범죄_norm'], row['CCTV_norm']]
@@ -457,7 +457,7 @@ elif menu == '🆕 맞춤형 조회':
                              showlegend=True, height=450)
         st.plotly_chart(fig_gu, use_container_width=True)
 
-        st.subheader(f'📈 {selected_gu} 연도별 범죄율 추이')
+        st.subheader(f'{selected_gu} 연도별 범죄율 추이')
         gu_crime = crime[crime['자치구별'].str.strip() == selected_gu]
         if not gu_crime.empty:
             years = [2019, 2020, 2021, 2022, 2023]
@@ -474,7 +474,7 @@ elif menu == '🆕 맞춤형 조회':
             st.plotly_chart(fig_trend, use_container_width=True)
 
     with tab2:
-        st.subheader('🎯 조건으로 자치구 필터링')
+        st.subheader('조건으로 자치구 필터링')
         col_a, col_b = st.columns(2)
         with col_a:
             risk_range = st.slider('위험도 점수 범위', 0.0, 100.0, (0.0, 100.0), step=1.0)
@@ -536,7 +536,7 @@ elif menu == '🆕 맞춤형 조회':
             st.warning("조건에 맞는 자치구가 없습니다. 조건을 완화해보세요.")
 
     with tab3:
-        st.subheader('📊 자치구 비교 분석')
+        st.subheader('자치구 비교 분석')
         all_gu = sorted(risk_df['자치구별'].tolist())
         compare_list = st.multiselect('비교할 자치구 선택 (최대 5개)', all_gu, default=all_gu[:3], max_selections=5)
 
