@@ -408,7 +408,13 @@ def load_data():
 
     # --- 2025년 인구 데이터 추가 (population_seoul.csv) → 2024년 분석에 사용 ---
     try:
-        pop_2025_raw = pd.read_csv('population_seoul.csv', encoding='utf-8')
+        # 인코딩 자동 감지
+        for enc in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
+            try:
+                pop_2025_raw = pd.read_csv('population_seoul.csv', encoding=enc)
+                break
+            except:
+                continue
         pop_2025_list = []
         for _, row in pop_2025_raw.iloc[1:].iterrows():
             raw = str(row.iloc[0])
