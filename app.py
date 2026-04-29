@@ -551,6 +551,16 @@ col_r = f'{year}_범죄율'
 col_a = f'{year}_검거율'
 col_p = f'{year}_인구'
 
+# 선택한 연도의 컬럼이 데이터에 없으면 가장 가까운 연도로 대체
+if col_r not in crime.columns:
+    col_r = '2023_범죄율'
+if col_a not in crime.columns:
+    col_a = '2023_검거율'
+if col_o not in occur.columns:
+    col_o = '2023_발생'
+if col_p not in pop.columns:
+    col_p = '2023_인구'
+
 
 # ============================================================
 # 헤더 배너
