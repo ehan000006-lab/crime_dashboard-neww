@@ -440,9 +440,29 @@ def load_data():
     except Exception as e:
         st.warning(f"2024 범죄율 계산 실패: {e}")
 
-    return crime, occur, cctv, pop
+    # --- 면적 데이터 (area_seoul.csv) ---
+    area = pd.DataFrame()
+    try:
+        for enc in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
+            try:
+                area_raw = pd.read_csv('area_seoul.csv', encoding=enc)
+                break
+            except:
+                continue
+        area_list = []
+        for _, row in area_raw.iloc[2:].iterrows():
+            gu = str(row.iloc[1]).strip()
+            if gu == '소계':
+                continue
+            km2 = float(str(row.iloc[2]).replace(',',''))
+            area_list.append({'자치구별': gu, '면적_km2': km2})
+        area = pd.DataFrame(area_list)
+    except Exception as e:
+        st.warning(f"area_seoul.csv 로딩 실패: {e}")
 
-crime, occur, cctv, pop = load_data()
+    return crime, occur, cctv, pop, area
+
+crime, occur, cctv, pop, area = load_data()
 
 @st.cache_data
 def load_geojson():
@@ -865,6 +885,44 @@ elif menu == "📹 CCTV 현황":
             ).add_to(m_cctv)
 
     st_folium(m_cctv, width=None, height=500, returned_objects=[])
+
+    # 면적당 CCTV 밀도 (area_seoul.csv 활용)
+    if not area.empty:
+        st.markdown('<div class="panel-card"><div class="panel-title">📐 면적(km²)당 CCTV 설치 밀도</div></div>', unsafe_allow_html=True)
+        area_cctv = pd.merge(
+            cctv[['자치구','총계']].rename(columns={'자치구':'자치구별'}),
+            area, on='자치구별', how='inner'
+        )
+        area_cctv['km2당_CCTV'] = (area_cctv['총계'] / area_cctv['면적_km2']).round(1)
+        area_cctv = area_cctv.sort_values('km2당_CCTV', ascending=False)
+
+        fig_area_cctv = px.bar(
+            area_cctv, x='자치구별', y='km2당_CCTV',
+            color='km2당_CCTV', color_continuous_scale='Oranges',
+            labels={'km2당_CCTV': 'km²당 CCTV 대수', '자치구별': ''}
+        )
+        plotly_dark_layout(fig_area_cctv, height=450)
+        fig_area_cctv.update_layout(xaxis_tickangle=-45, coloraxis_showscale=False)
+        st.plotly_chart(fig_area_cctv, use_container_width=True)
+
+        # 면적당 범죄 밀도
+        if col_o in occur.columns:
+            st.markdown('<div class="panel-card"><div class="panel-title">🚨 면적(km²)당 범죄 발생 밀도</div></div>', unsafe_allow_html=True)
+            area_crime = pd.merge(
+                occur[['자치구별', col_o]],
+                area, on='자치구별', how='inner'
+            )
+            area_crime['km2당_범죄'] = (area_crime[col_o] / area_crime['면적_km2']).round(1)
+            area_crime = area_crime.sort_values('km2당_범죄', ascending=False)
+
+            fig_area_crime = px.bar(
+                area_crime, x='자치구별', y='km2당_범죄',
+                color='km2당_범죄', color_continuous_scale='YlOrRd',
+                labels={'km2당_범죄': 'km²당 범죄 건수', '자치구별': ''}
+            )
+            plotly_dark_layout(fig_area_crime, height=450)
+            fig_area_crime.update_layout(xaxis_tickangle=-45, coloraxis_showscale=False)
+            st.plotly_chart(fig_area_crime, use_container_width=True)
 
 
 # ============================================================
