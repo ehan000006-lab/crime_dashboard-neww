@@ -1232,3 +1232,121 @@ elif menu == "🔮 CCTV 예측 시뮬레이터":
         display_df = priority_df[available_cols].reset_index(drop=True)
         display_df.index = display_df.index + 1
         st.dataframe(display_df, use_container_width=True)
+
+    # ============================================================
+    # 한윤수 XGBoost 모델 결과 연동
+    # ============================================================
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+    st.markdown('''
+    <div class="panel-card">
+        <div class="panel-title">🤖 XGBoost 범죄 위험도 예측 모델 분석 (한윤수)</div>
+        <div style="font-size:13px;color:#94a3b8;line-height:1.7;">
+            야간 유동인구, 노후주택 비율, 고시원 수, 조도 지수 등 다변량 환경 요인을 반영한 XGBoost 모델 기반 예측 결과입니다.
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    try:
+        xgb_df = pd.read_csv('Seoul_Crime_Model_Data.csv', encoding='utf-8-sig')
+        # 서울 25개 자치구만 필터링
+        seoul_gu_list = list(gu_coords.keys())
+        xgb_seoul = xgb_df[xgb_df['자치구'].isin(seoul_gu_list)].copy()
+        xgb_loaded = True
+    except Exception as e:
+        st.warning(f"한윤수 모델 데이터 로딩 실패: {e}")
+        xgb_loaded = False
+
+    if xgb_loaded and len(xgb_seoul) > 0:
+        xgb_seoul = xgb_seoul.sort_values('예측_위험도_점수', ascending=False)
+
+        # KPI 카드
+        max_risk_gu = xgb_seoul.iloc[0]['자치구']
+        max_risk_score = xgb_seoul.iloc[0]['예측_위험도_점수']
+        max_priority_gu = xgb_seoul.sort_values('CCTV_설치_우선순위_점수', ascending=False).iloc[0]['자치구']
+        max_priority_score = xgb_seoul.sort_values('CCTV_설치_우선순위_점수', ascending=False).iloc[0]['CCTV_설치_우선순위_점수']
+        avg_risk = xgb_seoul['예측_위험도_점수'].mean()
+
+        st.markdown(make_kpi_html([
+            ('🔴 최고 위험도', max_risk_gu, f'{max_risk_score:.1f}점', 'red'),
+            ('🎯 최우선 설치', max_priority_gu, f'{max_priority_score:.1f}점', 'orange'),
+            ('📊 평균 위험도', f'{avg_risk:.1f}점', '서울시 25개 자치구', 'cyan'),
+            ('🤖 모델', 'XGBoost', '다변량 환경 요인 반영', 'purple'),
+        ]), unsafe_allow_html=True)
+
+        # 예측 위험도 점수 차트
+        st.markdown('<div class="panel-card"><div class="panel-title">🔴 자치구별 예측 위험도 점수 (XGBoost)</div></div>', unsafe_allow_html=True)
+        fig_risk = px.bar(
+            xgb_seoul, x='자치구', y='예측_위험도_점수',
+            color='예측_위험도_점수', color_continuous_scale='YlOrRd',
+            text=xgb_seoul['예측_위험도_점수'].apply(lambda x: f'{x:.1f}'),
+            labels={'예측_위험도_점수': '위험도 점수', '자치구': ''}
+        )
+        fig_risk.update_traces(textposition='outside')
+        plotly_dark_layout(fig_risk, height=450)
+        fig_risk.update_layout(xaxis_tickangle=-45, coloraxis_showscale=False)
+        st.plotly_chart(fig_risk, use_container_width=True)
+
+        # CCTV 설치 우선순위 점수 차트
+        xgb_priority = xgb_seoul.sort_values('CCTV_설치_우선순위_점수', ascending=False)
+        st.markdown('<div class="panel-card"><div class="panel-title">🎯 자치구별 CCTV 설치 우선순위 점수 (XGBoost)</div></div>', unsafe_allow_html=True)
+        fig_xgb_pri = px.bar(
+            xgb_priority, x='자치구', y='CCTV_설치_우선순위_점수',
+            color='CCTV_설치_우선순위_점수', color_continuous_scale='Purples',
+            text=xgb_priority['CCTV_설치_우선순위_점수'].apply(lambda x: f'{x:.1f}'),
+            labels={'CCTV_설치_우선순위_점수': '우선순위 점수', '자치구': ''}
+        )
+        fig_xgb_pri.update_traces(textposition='outside')
+        plotly_dark_layout(fig_xgb_pri, height=450)
+        fig_xgb_pri.update_layout(xaxis_tickangle=-45, coloraxis_showscale=False)
+        st.plotly_chart(fig_xgb_pri, use_container_width=True)
+
+        # 위험도 vs 우선순위 산점도
+        st.markdown('<div class="panel-card"><div class="panel-title">🔗 위험도 점수 vs CCTV 설치 우선순위 (XGBoost)</div></div>', unsafe_allow_html=True)
+        fig_xgb_scatter = px.scatter(
+            xgb_seoul, x='예측_위험도_점수', y='CCTV_설치_우선순위_점수',
+            text='자치구', size='CCTV_대수',
+            color='예측_위험도_점수', color_continuous_scale='YlOrRd',
+            labels={'예측_위험도_점수': '예측 위험도 점수', 'CCTV_설치_우선순위_점수': 'CCTV 설치 우선순위 점수'}
+        )
+        fig_xgb_scatter.update_traces(textposition='top center', textfont=dict(size=10, color='#94a3b8'))
+        plotly_dark_layout(fig_xgb_scatter, height=500)
+        fig_xgb_scatter.update_layout(coloraxis_showscale=False)
+        st.plotly_chart(fig_xgb_scatter, use_container_width=True)
+
+        # XGBoost 위험도 지도
+        st.markdown('<div class="panel-card"><div class="panel-title">🗺️ XGBoost 예측 위험도 지도</div></div>', unsafe_allow_html=True)
+        m_xgb = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles='CartoDB dark_matter')
+
+        folium.Choropleth(
+            geo_data=seoul_geo,
+            data=xgb_seoul,
+            columns=['자치구', '예측_위험도_점수'],
+            key_on='feature.properties.name',
+            fill_color='YlOrRd',
+            fill_opacity=0.7,
+            line_opacity=0.3,
+            legend_name='XGBoost 예측 위험도 점수'
+        ).add_to(m_xgb)
+
+        xgb_map = xgb_seoul.set_index('자치구')
+        for gu, coord in gu_coords.items():
+            if gu in xgb_map.index:
+                row = xgb_map.loc[gu]
+                risk = row['예측_위험도_점수']
+                pri = row['CCTV_설치_우선순위_점수']
+                cctv_cnt = row['CCTV_대수']
+                color = '#ef4444' if risk >= 60 else '#f97316' if risk >= 30 else '#10b981'
+                folium.CircleMarker(
+                    location=coord, radius=max(5, risk / 7),
+                    color=color, fill=True, fill_color=color, fill_opacity=0.7,
+                    tooltip=f"{gu} | 위험도: {risk:.1f} | 우선순위: {pri:.1f} | CCTV: {cctv_cnt:.0f}대"
+                ).add_to(m_xgb)
+
+        st_folium(m_xgb, width=None, height=500, returned_objects=[])
+
+        # 상세 데이터 테이블
+        st.markdown("**📋 XGBoost 모델 전체 분석 결과 (서울 25개 자치구)**")
+        xgb_display = xgb_seoul[['자치구', '야간_유동인구', 'CCTV_대수', '발생_10만명당',
+                                  '예측_위험도_점수', 'CCTV_설치_우선순위_점수', '조도_지수']].reset_index(drop=True)
+        xgb_display.index = xgb_display.index + 1
+        st.dataframe(xgb_display, use_container_width=True)
