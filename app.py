@@ -1101,75 +1101,134 @@ elif menu == "🔮 CCTV 예측 시뮬레이터":
         </div>
         ''', unsafe_allow_html=True)
 
-    # CCTV 필요도 분석
-    st.markdown('<div class="panel-card"><div class="panel-title">🎯 CCTV 추가 설치 필요도 분석 (범죄율 높고 CCTV 적은 지역)</div></div>', unsafe_allow_html=True)
+    # ============================================================
+    # 황준연 ML 모델 결과 연동
+    # ============================================================
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+    st.markdown('''
+    <div class="panel-card">
+        <div class="panel-title">🔬 ML 모델 기반 CCTV 추가 설치 우선순위 분석 (황준연)</div>
+        <div style="font-size:13px;color:#94a3b8;line-height:1.7;">
+            범죄율, CCTV 밀도, CCTV 1대당 범죄 부담을 종합한 우선순위 점수 기반 분류 모델 결과입니다.<br>
+            가중치: 범죄율 40% + CCTV 밀도 부족도 40% + CCTV 1대당 범죄 부담 20%
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
-    # 필요도 점수 계산
-    need_data = []
-    for _, row in crime.iterrows():
-        gu = row['자치구별']
-        cr = row[col_r] if col_r in crime.columns else 0
-        ct = cctv.loc[cctv['자치구']==gu, '총계'].values
-        ct = int(ct[0]) if len(ct) > 0 else 0
-        pp_val = pop.loc[pop['자치구별']==gu, '2023_인구'].values
-        pp_val = int(pp_val[0]) if len(pp_val) > 0 else 1
-        per1k = ct / pp_val * 1000
-        avg_cr = crime[col_r].mean() if col_r in crime.columns else 1
-        avg_per1k_all = 13  # 대략적 평균
-        need_score = (cr / avg_cr) * (avg_per1k_all / max(per1k, 1))
-        need_data.append({
-            '자치구': gu, '범죄율': cr, 'CCTV': ct,
-            '천명당CCTV': round(per1k, 1), '필요도점수': round(need_score, 2)
-        })
+    # 모델 결과 CSV 로딩
+    try:
+        model_df = pd.read_csv('cctv_model_result_revised.csv', encoding='utf-8-sig')
+        model_loaded = True
+    except Exception as e:
+        st.warning(f"모델 결과 파일 로딩 실패: {e}")
+        model_loaded = False
 
-    need_df = pd.DataFrame(need_data).sort_values('필요도점수', ascending=False)
+    if model_loaded:
+        # 모델 성능 비교 차트
+        st.markdown('<div class="panel-card"><div class="panel-title">📊 모델별 정확도 비교</div></div>', unsafe_allow_html=True)
+        model_perf = pd.DataFrame({
+            '모델': ['Decision Tree', 'Random Forest', 'SVM', 'KNN'],
+            '정확도': [0.857, 0.857, 0.714, 0.571]
+        }).sort_values('정확도', ascending=False)
 
-    # 필요도 상위 10개 차트
-    fig_need = px.bar(
-        need_df.head(10), x='필요도점수', y='자치구', orientation='h',
-        color='필요도점수', color_continuous_scale='YlOrRd',
-        text='필요도점수',
-        labels={'필요도점수': '설치 필요도 점수', '자치구': ''}
-    )
-    fig_need.update_traces(texttemplate='%{text:.2f}', textposition='outside')
-    plotly_dark_layout(fig_need, height=400)
-    fig_need.update_layout(yaxis=dict(autorange='reversed'), coloraxis_showscale=False)
-    st.plotly_chart(fig_need, use_container_width=True)
+        fig_perf = px.bar(
+            model_perf, x='모델', y='정확도',
+            color='정확도', color_continuous_scale='teal',
+            text=model_perf['정확도'].apply(lambda x: f'{x:.1%}'),
+            labels={'정확도': '정확도 (Accuracy)', '모델': ''}
+        )
+        fig_perf.update_traces(textposition='outside')
+        plotly_dark_layout(fig_perf, height=400)
+        fig_perf.update_layout(coloraxis_showscale=False, yaxis=dict(range=[0, 1]))
+        st.plotly_chart(fig_perf, use_container_width=True)
 
-    # 필요도 상세 테이블
-    st.markdown("**📋 전체 자치구 CCTV 필요도 순위**")
-    need_display = need_df[['자치구','범죄율','CCTV','천명당CCTV','필요도점수']].reset_index(drop=True)
-    need_display.index = need_display.index + 1
-    st.dataframe(need_display, use_container_width=True)
+        # CCTV 추가 설치 우선순위 표
+        st.markdown('<div class="panel-card"><div class="panel-title">🎯 CCTV 추가 설치 우선순위 (ML 모델 결과)</div></div>', unsafe_allow_html=True)
+        priority_df = model_df.sort_values('추가설치우선순위점수', ascending=False)
 
-    # CCTV 필요도 지도
-    st.markdown('<div class="panel-card"><div class="panel-title">🗺️ CCTV 추가 설치 필요도 지도</div></div>', unsafe_allow_html=True)
-    m_need = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles='CartoDB dark_matter')
+        fig_priority = px.bar(
+            priority_df, x='자치구', y='추가설치우선순위점수',
+            color='추가설치필요도',
+            color_discrete_map={'높음': '#ef4444', '보통': '#f97316', '낮음': '#10b981'},
+            text=priority_df['추가설치우선순위점수'].apply(lambda x: f'{x:.1f}'),
+            labels={'추가설치우선순위점수': '우선순위 점수', '자치구': '', '추가설치필요도': '설치 필요도'}
+        )
+        fig_priority.update_traces(textposition='outside')
+        plotly_dark_layout(fig_priority, height=500)
+        fig_priority.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig_priority, use_container_width=True)
 
-    need_map_data = need_df.set_index('자치구')
-    max_need = need_df['필요도점수'].max()
+        # 분석 인사이트
+        st.markdown('''
+        <div class="panel-card">
+            <div class="panel-title">💡 주요 분석 결과</div>
+            <div style="font-size:13px;color:#cbd5e1;line-height:2;">
+                • <b style="color:#ef4444;">중구</b>는 인구 1만 명당 범죄 수가 가장 높지만, 인구 1만 명당 CCTV 수 역시 매우 높아 CCTV 밀도 부족도가 낮게 반영되어 최상위 우선순위에서 제외됨<br>
+                • <b style="color:#ef4444;">송파구</b>는 범죄율이 평균 이상이면서 CCTV 밀도가 상대적으로 낮고, CCTV 1대당 범죄 부담이 높아 추가 설치 우선순위가 가장 높게 산출됨<br>
+                • 최종 선택 모델: <b style="color:#22d3ee;">Decision Tree / Random Forest</b> (정확도 85.7%)
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
-    folium.Choropleth(
-        geo_data=seoul_geo,
-        data=need_df,
-        columns=['자치구', '필요도점수'],
-        key_on='feature.properties.name',
-        fill_color='YlOrRd',
-        fill_opacity=0.7,
-        line_opacity=0.3,
-        legend_name='CCTV 설치 필요도 점수'
-    ).add_to(m_need)
+        # CCTV 밀도와 범죄율 산점도
+        if '인구1만명당범죄수' in model_df.columns and '인구1만명당CCTV수' in model_df.columns:
+            st.markdown('<div class="panel-card"><div class="panel-title">🔗 CCTV 밀도 vs 범죄율 관계 (ML 분석)</div></div>', unsafe_allow_html=True)
 
-    for gu, coord in gu_coords.items():
-        if gu in need_map_data.index:
-            score = need_map_data.loc[gu, '필요도점수']
-            per1k = need_map_data.loc[gu, '천명당CCTV']
-            cr = need_map_data.loc[gu, '범죄율']
-            color = '#ef4444' if score > 1.3 else '#f97316' if score > 1.0 else '#22d3ee'
-            folium.CircleMarker(
-                location=coord, radius=max(5, score * 6),
-                color=color, fill=True, fill_color=color, fill_opacity=0.7,
-                tooltip=f"{gu} | 필요도: {score:.2f} | 범죄율: {cr}% | 천명당CCTV: {per1k}"
-            ).add_to(m_need)
+            fig_scatter = px.scatter(
+                model_df, x='인구1만명당CCTV수', y='인구1만명당범죄수',
+                color='추가설치필요도', text='자치구',
+                color_discrete_map={'높음': '#ef4444', '보통': '#f97316', '낮음': '#10b981'},
+                size='CCTV1대당범죄수',
+                labels={'인구1만명당CCTV수': '인구 1만명당 CCTV 수', '인구1만명당범죄수': '인구 1만명당 범죄 수', '추가설치필요도': '설치 필요도'}
+            )
+            fig_scatter.update_traces(textposition='top center', textfont=dict(size=10, color='#94a3b8'))
 
-    st_folium(m_need, width=None, height=500, returned_objects=[])
+            # 평균선
+            avg_crime = model_df['인구1만명당범죄수'].mean()
+            avg_cctv = model_df['인구1만명당CCTV수'].mean()
+            fig_scatter.add_hline(y=avg_crime, line_dash='dash', line_color='rgba(255,255,255,0.3)', annotation_text='범죄율 평균')
+            fig_scatter.add_vline(x=avg_cctv, line_dash='dash', line_color='rgba(255,255,255,0.3)', annotation_text='CCTV 밀도 평균')
+
+            plotly_dark_layout(fig_scatter, height=550)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+        # CCTV 추가 설치 필요도 지도
+        st.markdown('<div class="panel-card"><div class="panel-title">🗺️ CCTV 추가 설치 필요도 지도 (ML 모델 결과)</div></div>', unsafe_allow_html=True)
+        m_need = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles='CartoDB dark_matter')
+
+        folium.Choropleth(
+            geo_data=seoul_geo,
+            data=priority_df,
+            columns=['자치구', '추가설치우선순위점수'],
+            key_on='feature.properties.name',
+            fill_color='YlOrRd',
+            fill_opacity=0.7,
+            line_opacity=0.3,
+            legend_name='CCTV 추가 설치 우선순위 점수'
+        ).add_to(m_need)
+
+        need_map_data = priority_df.set_index('자치구')
+        for gu, coord in gu_coords.items():
+            if gu in need_map_data.index:
+                row = need_map_data.loc[gu]
+                score = row['추가설치우선순위점수']
+                need_label = row['추가설치필요도']
+                pred_label = row['예측_추가설치필요도']
+                color = '#ef4444' if need_label == '높음' else '#f97316' if need_label == '보통' else '#10b981'
+                folium.CircleMarker(
+                    location=coord, radius=max(5, score / 5),
+                    color=color, fill=True, fill_color=color, fill_opacity=0.7,
+                    tooltip=f"{gu} | 점수: {score:.1f} | 필요도: {need_label} | 예측: {pred_label}"
+                ).add_to(m_need)
+
+        st_folium(m_need, width=None, height=500, returned_objects=[])
+
+        # 전체 자치구 상세 테이블
+        st.markdown("**📋 전체 자치구 CCTV 추가 설치 우선순위 상세**")
+        display_cols = ['자치구', '총범죄수', 'CCTV수', '인구수', '면적',
+                       '인구1만명당범죄수', '인구1만명당CCTV수', 'CCTV1대당범죄수',
+                       '추가설치우선순위점수', '추가설치필요도', '예측_추가설치필요도']
+        available_cols = [c for c in display_cols if c in priority_df.columns]
+        display_df = priority_df[available_cols].reset_index(drop=True)
+        display_df.index = display_df.index + 1
+        st.dataframe(display_df, use_container_width=True)
