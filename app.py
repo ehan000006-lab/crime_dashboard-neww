@@ -1328,13 +1328,13 @@ elif menu == "🔮 CCTV 예측 시뮬레이터":
             legend_name='XGBoost 예측 위험도 점수'
         ).add_to(m_xgb)
 
-        xgb_map = xgb_seoul.set_index('자치구')
+        xgb_map = xgb_seoul.drop_duplicates(subset='자치구', keep='first').set_index('자치구')
         for gu, coord in gu_coords.items():
             if gu in xgb_map.index:
                 row = xgb_map.loc[gu]
-                risk = float(row['예측_위험도_점수']) if not isinstance(row['예측_위험도_점수'], float) else row['예측_위험도_점수']
-                pri = float(row['CCTV_설치_우선순위_점수']) if not isinstance(row['CCTV_설치_우선순위_점수'], float) else row['CCTV_설치_우선순위_점수']
-                cctv_cnt = float(row['CCTV_대수']) if not isinstance(row['CCTV_대수'], float) else row['CCTV_대수']
+                risk = float(row['예측_위험도_점수'])
+                pri = float(row['CCTV_설치_우선순위_점수'])
+                cctv_cnt = float(row['CCTV_대수'])
                 color = '#ef4444' if risk >= 60 else '#f97316' if risk >= 30 else '#10b981'
                 folium.CircleMarker(
                     location=coord, radius=max(5, risk / 7),
