@@ -555,7 +555,7 @@ with st.sidebar:
 
     menu = st.radio(
         "메뉴",
-        ["🗺️ 안전 지도", "📊 범죄 현황", "📹 CCTV 현황", "📈 통계 비교", "🔮 CCTV 예측 시뮬레이터", "🧠 AI 심층 분석"],
+        ["🗺️ 안전 지도", "📊 범죄 현황", "📹 CCTV 현황", "📈 통계 비교", "🔮 CCTV 예측 시뮬레이터", "🔍 범죄 유형별 분석", "🧠 AI 심층 분석"],
         label_visibility="collapsed"
     )
 
@@ -1355,7 +1355,131 @@ elif menu == "🔮 CCTV 예측 시뮬레이터":
         st.dataframe(xgb_display, use_container_width=True)
 
 # ============================================================
-# 페이지 6: AI 심층 분석 (한윤수 XGBoost + Gemini 질의응답)
+# 페이지 6: 범죄 유형별 분석
+# ============================================================
+elif menu == "🔍 범죄 유형별 분석":
+    st.markdown('<div class="page-header"><span class="page-icon">🔍</span>5대 범죄 유형별 분석 (2024년)</div>', unsafe_allow_html=True)
+
+    # crime_seoul.csv에서 유형별 데이터 파싱
+    try:
+        crime_type_raw = pd.read_csv('crime_seoul.csv', encoding='utf-8-sig')
+        crime_type_data = crime_type_raw.iloc[3:].copy()
+        crime_type_df = pd.DataFrame({
+            '자치구': crime_type_data.iloc[:, 1].astype(str).str.strip(),
+            '총범죄_발생': pd.to_numeric(crime_type_data.iloc[:, 2].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '총범죄_검거': pd.to_numeric(crime_type_data.iloc[:, 3].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '살인_발생': pd.to_numeric(crime_type_data.iloc[:, 4].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '살인_검거': pd.to_numeric(crime_type_data.iloc[:, 5].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '강도_발생': pd.to_numeric(crime_type_data.iloc[:, 6].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '강도_검거': pd.to_numeric(crime_type_data.iloc[:, 7].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '강간강제추행_발생': pd.to_numeric(crime_type_data.iloc[:, 8].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '강간강제추행_검거': pd.to_numeric(crime_type_data.iloc[:, 9].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '절도_발생': pd.to_numeric(crime_type_data.iloc[:, 10].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '절도_검거': pd.to_numeric(crime_type_data.iloc[:, 11].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '폭력_발생': pd.to_numeric(crime_type_data.iloc[:, 12].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+            '폭력_검거': pd.to_numeric(crime_type_data.iloc[:, 13].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce'),
+        })
+        crime_type_df = crime_type_df[crime_type_df['자치구'] != '소계'].dropna()
+        crime_type_loaded = True
+    except Exception as e:
+        st.warning(f"범죄 유형별 데이터 로딩 실패: {e}")
+        crime_type_loaded = False
+
+    if crime_type_loaded:
+        # 서울시 전체 요약 KPI
+        total_row = crime_type_df.sum(numeric_only=True)
+        st.markdown(make_kpi_html([
+            ('🔪 살인', f"{int(total_row['살인_발생'])}건", f"검거 {int(total_row['살인_검거'])}건", 'red'),
+            ('🔫 강도', f"{int(total_row['강도_발생'])}건", f"검거 {int(total_row['강도_검거'])}건", 'orange'),
+            ('⚠️ 강간·강제추행', f"{int(total_row['강간강제추행_발생'])}건", f"검거 {int(total_row['강간강제추행_검거'])}건", 'purple'),
+            ('🛍️ 절도', f"{int(total_row['절도_발생'])}건", f"검거 {int(total_row['절도_검거'])}건", 'cyan'),
+        ]), unsafe_allow_html=True)
+
+        # 유형 선택
+        crime_types = ['살인', '강도', '강간강제추행', '절도', '폭력']
+        selected_type = st.selectbox("📌 분석할 범죄 유형 선택", crime_types)
+
+        col_occur = f'{selected_type}_발생'
+        col_arrest = f'{selected_type}_검거'
+
+        sorted_df = crime_type_df.sort_values(col_occur, ascending=False)
+
+        # 발생 건수 바차트
+        st.markdown(f'<div class="panel-card"><div class="panel-title">📊 자치구별 {selected_type} 발생 건수</div></div>', unsafe_allow_html=True)
+        fig_type = px.bar(
+            sorted_df, x='자치구', y=col_occur,
+            color=col_occur, color_continuous_scale='YlOrRd',
+            text=sorted_df[col_occur].apply(lambda x: f'{int(x)}'),
+            labels={col_occur: '발생 건수', '자치구': ''}
+        )
+        fig_type.update_traces(textposition='outside')
+        plotly_dark_layout(fig_type, height=450)
+        fig_type.update_layout(xaxis_tickangle=-45, coloraxis_showscale=False)
+        st.plotly_chart(fig_type, use_container_width=True)
+
+        # 발생 vs 검거 비교
+        st.markdown(f'<div class="panel-card"><div class="panel-title">⚖️ {selected_type} 발생 vs 검거 비교</div></div>', unsafe_allow_html=True)
+        fig_compare = go.Figure()
+        fig_compare.add_trace(go.Bar(name='발생', x=sorted_df['자치구'], y=sorted_df[col_occur], marker_color='#ef4444'))
+        fig_compare.add_trace(go.Bar(name='검거', x=sorted_df['자치구'], y=sorted_df[col_arrest], marker_color='#22d3ee'))
+        fig_compare.update_layout(barmode='group')
+        plotly_dark_layout(fig_compare, height=450)
+        fig_compare.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig_compare, use_container_width=True)
+
+        # 검거율 차트
+        st.markdown(f'<div class="panel-card"><div class="panel-title">🎯 자치구별 {selected_type} 검거율</div></div>', unsafe_allow_html=True)
+        arrest_df = sorted_df.copy()
+        arrest_df['검거율'] = (arrest_df[col_arrest] / arrest_df[col_occur].replace(0, 1) * 100).round(1)
+        arrest_df = arrest_df.sort_values('검거율', ascending=True)
+
+        fig_arrest = px.bar(
+            arrest_df, x='검거율', y='자치구', orientation='h',
+            color='검거율', color_continuous_scale='Teal',
+            text=arrest_df['검거율'].apply(lambda x: f'{x:.1f}%'),
+            labels={'검거율': '검거율 (%)', '자치구': ''}
+        )
+        fig_arrest.update_traces(textposition='outside')
+        plotly_dark_layout(fig_arrest, height=550)
+        fig_arrest.update_layout(yaxis=dict(autorange='reversed'), coloraxis_showscale=False)
+        st.plotly_chart(fig_arrest, use_container_width=True)
+
+        # 5대 범죄 유형 구성 비율 (전체)
+        st.markdown('<div class="panel-card"><div class="panel-title">🥧 서울시 5대 범죄 유형 구성 비율</div></div>', unsafe_allow_html=True)
+        pie_data = pd.DataFrame({
+            '유형': ['살인', '강도', '강간·강제추행', '절도', '폭력'],
+            '발생건수': [int(total_row['살인_발생']), int(total_row['강도_발생']),
+                      int(total_row['강간강제추행_발생']), int(total_row['절도_발생']), int(total_row['폭력_발생'])]
+        })
+        fig_pie = px.pie(pie_data, values='발생건수', names='유형',
+                         color_discrete_sequence=['#ef4444', '#f97316', '#a855f7', '#22d3ee', '#eab308'])
+        plotly_dark_layout(fig_pie, height=400)
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # 자치구별 유형별 히트맵
+        st.markdown('<div class="panel-card"><div class="panel-title">🔥 자치구별 5대 범죄 발생 히트맵</div></div>', unsafe_allow_html=True)
+        heatmap_df = crime_type_df.set_index('자치구')[['살인_발생', '강도_발생', '강간강제추행_발생', '절도_발생', '폭력_발생']]
+        heatmap_df.columns = ['살인', '강도', '강간·강제추행', '절도', '폭력']
+
+        fig_heat = px.imshow(
+            heatmap_df.values,
+            labels=dict(x="범죄 유형", y="자치구", color="발생 건수"),
+            x=heatmap_df.columns.tolist(),
+            y=heatmap_df.index.tolist(),
+            color_continuous_scale='YlOrRd',
+            aspect='auto'
+        )
+        plotly_dark_layout(fig_heat, height=700)
+        st.plotly_chart(fig_heat, use_container_width=True)
+
+        # 상세 테이블
+        st.markdown("**📋 전체 자치구 5대 범죄 유형별 상세 데이터**")
+        table_df = crime_type_df[['자치구', '살인_발생', '강도_발생', '강간강제추행_발생', '절도_발생', '폭력_발생', '총범죄_발생']].sort_values('총범죄_발생', ascending=False).reset_index(drop=True)
+        table_df.index = table_df.index + 1
+        st.dataframe(table_df, use_container_width=True)
+
+# ============================================================
+# 페이지 7: AI 심층 분석 (한윤수 XGBoost + Gemini 질의응답)
 # ============================================================
 elif menu == "🧠 AI 심층 분석":
     st.markdown('<div class="page-header"><span class="page-icon">🧠</span>AI 심층 분석 — 자치구별 환경 요인 분석 & 정책 시뮬레이션</div>', unsafe_allow_html=True)
