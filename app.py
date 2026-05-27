@@ -555,7 +555,7 @@ with st.sidebar:
 
     menu = st.radio(
         "메뉴",
-        ["🗺️ 안전 지도", "📊 범죄 현황", "📹 CCTV 현황", "📈 통계 비교", "🔮 CCTV 예측 시뮬레이터", "🔍 범죄 유형별 분석", "🧠 AI 심층 분석"],
+        ["🗺️ 안전 지도", "📊 범죄 현황", "📹 CCTV 현황", "📈 통계 비교", "🔮 CCTV 예측 시뮬레이터", "🔍 범죄 유형별 분석", "📉 범죄 추이 예측", "🧠 AI 심층 분석"],
         label_visibility="collapsed"
     )
 
@@ -1479,7 +1479,157 @@ elif menu == "🔍 범죄 유형별 분석":
         st.dataframe(table_df, use_container_width=True)
 
 # ============================================================
-# 페이지 7: AI 심층 분석 (한윤수 XGBoost + Gemini 질의응답)
+# 페이지 7: 범죄 추이 예측
+# ============================================================
+elif menu == "📉 범죄 추이 예측":
+    st.markdown('<div class="page-header"><span class="page-icon">📉</span>범죄 추이 예측 — 연도별 트렌드 & 미래 전망</div>', unsafe_allow_html=True)
+
+    # 5개년 데이터 로딩
+    try:
+        for enc in ['cp949', 'euc-kr', 'utf-8', 'utf-8-sig']:
+            try:
+                trend_raw = pd.read_csv('자치구별 범죄율 검거율 5개년.csv', encoding=enc)
+                break
+            except:
+                continue
+
+        # 범죄율 파싱
+        years_5 = [2019, 2020, 2021, 2022, 2023]
+        trend_list = []
+        for _, row in trend_raw.iloc[1:].iterrows():
+            gu = str(row.iloc[0]).strip()
+            if not gu or gu == 'nan':
+                continue
+            for i, yr in enumerate(years_5):
+                cr_val = pd.to_numeric(str(row.iloc[1 + i * 2]).replace(',', ''), errors='coerce')
+                ar_val = pd.to_numeric(str(row.iloc[2 + i * 2]).replace(',', ''), errors='coerce')
+                trend_list.append({'자치구': gu, '연도': yr, '범죄율': cr_val, '검거율': ar_val})
+
+        # 2024년 데이터 추가 (crime에서)
+        if col_r in crime.columns and col_a in crime.columns:
+            for _, row in crime.iterrows():
+                gu = row['자치구별']
+                cr = row[col_r] if col_r in crime.columns else None
+                ar = row[col_a] if col_a in crime.columns else None
+                if pd.notna(cr):
+                    trend_list.append({'자치구': gu, '연도': 2024, '범죄율': cr, '검거율': ar})
+
+        trend_df = pd.DataFrame(trend_list).dropna(subset=['범죄율'])
+        trend_loaded = True
+    except Exception as e:
+        st.warning(f"추이 데이터 로딩 실패: {e}")
+        trend_loaded = False
+
+    if trend_loaded:
+        available_years = sorted(trend_df['연도'].unique())
+        all_gus = sorted(trend_df['자치구'].unique())
+
+        # 자치구 선택
+        selected_gus = st.multiselect("📍 분석할 자치구 선택 (최대 5개)", all_gus, default=['강남구', '송파구', '중구'], max_selections=5)
+
+        if selected_gus:
+            filtered = trend_df[trend_df['자치구'].isin(selected_gus)]
+
+            # 범죄율 추이 차트
+            st.markdown('<div class="panel-card"><div class="panel-title">📈 자치구별 범죄율 연도별 추이</div></div>', unsafe_allow_html=True)
+            fig_trend = px.line(
+                filtered, x='연도', y='범죄율', color='자치구',
+                markers=True, labels={'범죄율': '범죄율 (%)', '연도': '연도'}
+            )
+            plotly_dark_layout(fig_trend, height=450)
+            fig_trend.update_layout(xaxis=dict(dtick=1))
+            st.plotly_chart(fig_trend, use_container_width=True)
+
+            # 미래 예측 (선형 회귀)
+            st.markdown('<div class="panel-card"><div class="panel-title">🔮 범죄율 추세 예측 (2025~2026년)</div></div>', unsafe_allow_html=True)
+
+            fig_pred = go.Figure()
+            pred_years = [2025, 2026]
+
+            for gu in selected_gus:
+                gu_data = filtered[filtered['자치구'] == gu].sort_values('연도')
+                x = gu_data['연도'].values
+                y = gu_data['범죄율'].values
+
+                if len(x) >= 2:
+                    # 선형 회귀
+                    coeffs = np.polyfit(x, y, 1)
+                    poly = np.poly1d(coeffs)
+
+                    # 실제 데이터
+                    fig_pred.add_trace(go.Scatter(
+                        x=x, y=y, mode='lines+markers', name=f'{gu} (실측)',
+                        line=dict(width=2)
+                    ))
+
+                    # 예측
+                    all_x = list(x) + pred_years
+                    pred_y = [poly(yr) for yr in pred_years]
+                    fig_pred.add_trace(go.Scatter(
+                        x=pred_years, y=[max(0, p) for p in pred_y],
+                        mode='lines+markers', name=f'{gu} (예측)',
+                        line=dict(dash='dash', width=2),
+                        marker=dict(symbol='diamond', size=10)
+                    ))
+
+            plotly_dark_layout(fig_pred, height=500)
+            fig_pred.update_layout(xaxis=dict(dtick=1, title='연도'), yaxis_title='범죄율 (%)')
+            st.plotly_chart(fig_pred, use_container_width=True)
+
+            # 예측 결과 테이블
+            st.markdown('<div class="panel-card"><div class="panel-title">📋 2025~2026 범죄율 예측 결과</div></div>', unsafe_allow_html=True)
+            pred_table = []
+            for gu in selected_gus:
+                gu_data = filtered[filtered['자치구'] == gu].sort_values('연도')
+                x = gu_data['연도'].values
+                y = gu_data['범죄율'].values
+                if len(x) >= 2:
+                    coeffs = np.polyfit(x, y, 1)
+                    poly = np.poly1d(coeffs)
+                    cr_2024 = gu_data[gu_data['연도'] == gu_data['연도'].max()]['범죄율'].values[0]
+                    cr_2025 = max(0, poly(2025))
+                    cr_2026 = max(0, poly(2026))
+                    change = cr_2026 - cr_2024
+                    pred_table.append({
+                        '자치구': gu,
+                        f'{int(gu_data["연도"].max())}년 범죄율': f'{cr_2024:.2f}%',
+                        '2025년 예측': f'{cr_2025:.2f}%',
+                        '2026년 예측': f'{cr_2026:.2f}%',
+                        '변화 추세': '📈 증가' if change > 0.05 else '📉 감소' if change < -0.05 else '➡️ 유지'
+                    })
+            pred_result = pd.DataFrame(pred_table)
+            pred_result.index = pred_result.index + 1
+            st.dataframe(pred_result, use_container_width=True)
+
+            # 검거율 추이
+            if '검거율' in filtered.columns:
+                st.markdown('<div class="panel-card"><div class="panel-title">🎯 자치구별 검거율 연도별 추이</div></div>', unsafe_allow_html=True)
+                fig_arrest_trend = px.line(
+                    filtered, x='연도', y='검거율', color='자치구',
+                    markers=True, labels={'검거율': '검거율 (%)', '연도': '연도'}
+                )
+                plotly_dark_layout(fig_arrest_trend, height=400)
+                fig_arrest_trend.update_layout(xaxis=dict(dtick=1))
+                st.plotly_chart(fig_arrest_trend, use_container_width=True)
+
+            # 서울 전체 평균 추이
+            st.markdown('<div class="panel-card"><div class="panel-title">🏙️ 서울시 전체 평균 범죄율 추이</div></div>', unsafe_allow_html=True)
+            avg_trend = trend_df.groupby('연도').agg({'범죄율': 'mean', '검거율': 'mean'}).reset_index()
+            fig_avg = go.Figure()
+            fig_avg.add_trace(go.Scatter(x=avg_trend['연도'], y=avg_trend['범죄율'], mode='lines+markers', name='평균 범죄율', line=dict(color='#ef4444', width=3)))
+            fig_avg.add_trace(go.Scatter(x=avg_trend['연도'], y=avg_trend['검거율'], mode='lines+markers', name='평균 검거율', line=dict(color='#22d3ee', width=3), yaxis='y2'))
+            plotly_dark_layout(fig_avg, height=400)
+            fig_avg.update_layout(
+                xaxis=dict(dtick=1, title='연도'),
+                yaxis=dict(title='범죄율 (%)'),
+                yaxis2=dict(title='검거율 (%)', overlaying='y', side='right')
+            )
+            st.plotly_chart(fig_avg, use_container_width=True)
+        else:
+            st.info("분석할 자치구를 선택하세요.")
+
+# ============================================================
+# 페이지 8: AI 심층 분석 (한윤수 XGBoost + Gemini 질의응답)
 # ============================================================
 elif menu == "🧠 AI 심층 분석":
     st.markdown('<div class="page-header"><span class="page-icon">🧠</span>AI 심층 분석 — 자치구별 환경 요인 분석 & 정책 시뮬레이션</div>', unsafe_allow_html=True)
